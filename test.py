@@ -213,8 +213,15 @@ if __name__ == '__main__':
         executor.map(process_video, video_files)
     print("压缩完成！")
 
+# todo: windows适配：subprocess.run在win上需要写ffmpeg（或ffprobe）那个exe的全路径，不然报错，而linux直接ffmpeg就可以了。
+#  所以需要whereis ffmpeg自动获取到这个exe然后填进去
+
+# todo: 已压缩文件不再重复处理：目前压缩后的画面效果尚未验证，因此是在文件名加一个前缀compressed来区分。
+#  而后续应当是直接覆盖的，所以考虑：要么附带留一个log文件，要么在视频的元信息里写入一个标记
+
 
 # fix： 部分年代较早的视频转h265之后无法播放，原因未知，文件见附；h264可以播放，但压缩效果毕竟不好，并且会糊；vp9速度不到h265的一半，太慢了
+
 # fix： webm格式视频好像ffprobe获取信息不全，目前的写法会缺字段无法转换，可以考虑缺省。比如以下就会缺字段
 # ```
 # ffprobe  -v error -show_entries stream=duration,r_frame_rate,bit_rate,width,height,codec_name:stream=codec_name,bit_rate:stream=sample_rate -of json "/data/share
