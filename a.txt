@@ -1,0 +1,1 @@
+ffprobe  -v error -show_entries stream=duration,r_frame_rate,bit_rate,width,height,codec_name:stream=codec_name,bit_rate:stream=sample_rate -of json "/data/share/视频h/玛丽罗斯/CG1/compress/小悪魔サーバント (赤ブルマ).avi"
