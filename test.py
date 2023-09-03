@@ -29,10 +29,11 @@ def process_video(video_file):
     try:
         video_path=os.path.dirname(video_file)
         video_file=os.path.basename(video_file)
-        if(video_file.startswith("compressed_")):
-            return
+        base_name = os.path.splitext(video_file)[0]
+
         input_path = os.path.join(video_path, video_file)
-        output_path = os.path.join(video_path, 'compressed_'+video_file)
+        # 新的文件名，将后缀替换为.mp4
+        output_path = os.path.join(video_path, f"compressed_{base_name}.mp4")
 
         # 获取视频信息，可以使用 ffprobe 来获取
 
@@ -90,6 +91,10 @@ def predict_video_info(video_info):
     file_size           = video_info['file_size']
     file_name:str           = video_info['file_name']
     file_path:str           = video_info['file_path']
+
+    if (file_name.startswith("compressed_")):
+        video_info['should_be_modify']=False
+        return
 
 
     # VR不作调整
@@ -218,6 +223,7 @@ if __name__ == '__main__':
 
 
 # fix： 部分年代较早的视频转h265之后无法播放，原因未知，文件见附；h264可以播放，但压缩效果毕竟不好，并且会糊；vp9速度不到h265的一半，太慢了
+# 已提问题： https://stackoverflow.com/questions/77030749/when-using-ffmpeg-encode-to-hevc-but-got-rawvideo
 
 # fix： webm格式视频好像ffprobe获取信息不全，目前的写法会缺字段无法转换，可以考虑缺省。比如以下就会缺字段
 # ```

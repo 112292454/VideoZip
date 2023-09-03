@@ -12,12 +12,14 @@ ffprobe="ffprobe"
 # 获取文件夹内所有非目录文件
 def walk_files(root_dir):
     file_list = []
-
-    for root, dirs, files in os.walk(root_dir):
-        for file in files:
-            file_path = os.path.join(root, file)
-            if os.path.isfile(file_path):
-                file_list.append(file_path)
+    if not os.path.isdir(root_dir):
+        file_list.append(root_dir)
+    else:
+        for root, dirs, files in os.walk(root_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                if os.path.isfile(file_path):
+                    file_list.append(file_path)
 
     return file_list
 
