@@ -1,15 +1,26 @@
 import os
 import pprint
 import subprocess
+import sys
 import traceback
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 
 from tools import *
 
+
 input_folder = "D:\资源\糖心VLOG\[小晗喵]/1"
 output_folder = "D:\资源\糖心VLOG\compressed_videos"
 num_threads = 1  # 设置线程数
+
+ffmpeg = "ffmpeg"
+
+
+def init():
+    global ffmpeg
+    ffmpeg=get_os_program_name(ffmpeg)
+
+
 
 
 
@@ -40,7 +51,7 @@ def run_command(input_path, output_path, video_info):
     # 在这里添加判断逻辑，根据帧率、码率、大小等信息来确定压缩参数
     # 根据你的需求，可以调整视频的分辨率、帧率、码率等参数
     compress_command = [
-        'e:tool/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe',  # FFmpeg 命令
+        ffmpeg,  # FFmpeg 命令
         '-i', input_path,  # 输入文件路径
         '-c:v', video_info['video_codec_name'],  # 视频编码器
         # '-preset', 'fast',
@@ -171,32 +182,14 @@ def predict_video_info(video_info):
 
 
 
-
-
-
-
-
-
-
-
-
-
+init()
 
 if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--dir', type=str,required=False,
-                        help='to processed video dir')
-    parser.add_argument('-t', '--types', type=str, default='mp4,avi,webm,mov,mpg,m4a,m4v,mpeg,wmv ',
-                        help='to processed video type')
-    parser.add_argument('-thread', '--thread_num', type=int, default='4',
-                        help='thread num')
-
-    args = parser.parse_args()
+    args=get_args()
 
     num_threads=args.thread_num
     types=args.types.split(",")
-    # input_folder=args.dir
+    input_folder=args.dir
 
     # 创建输出文件夹
     if not os.path.exists(output_folder):
@@ -215,6 +208,7 @@ if __name__ == '__main__':
 
 # todo: windows适配：subprocess.run在win上需要写ffmpeg（或ffprobe）那个exe的全路径，不然报错，而linux直接ffmpeg就可以了。
 #  所以需要whereis ffmpeg自动获取到这个exe然后填进去
+# ——finished
 
 # todo: 已压缩文件不再重复处理：目前压缩后的画面效果尚未验证，因此是在文件名加一个前缀compressed来区分。
 #  而后续应当是直接覆盖的，所以考虑：要么附带留一个log文件，要么在视频的元信息里写入一个标记
