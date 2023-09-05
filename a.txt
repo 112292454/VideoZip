@@ -1,1 +1,0 @@
-ffprobe  -v error -show_entries stream=duration,r_frame_rate,bit_rate,width,height,codec_name:stream=codec_name,bit_rate:stream=sample_rate -of json ""
