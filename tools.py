@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import pprint
+import shutil
 import subprocess
 import sys
 from mutagen.mp4 import MP4, MP4Cover, MP4FreeForm

@@ -15,7 +15,8 @@ num_threads = 1  # 设置线程数
 
 ffmpeg = "ffmpeg"
 
-process_status={}
+process_status = {}
+size_change = {}
 
 
 def init():
@@ -32,6 +33,7 @@ def process_video(video_file):
         input_path = os.path.join(video_path, video_file)
         # 新的文件名，将后缀替换为.mp4
         output_path = os.path.join(video_path, f"compressed_{base_name}.mp4")
+        result_path = ""
 
         tags: dict = json.loads(read_mp4_tag(input_path, COMPRESSED_FLAG))
         if tags.get("has_compressed"):
@@ -46,23 +48,41 @@ def process_video(video_file):
         should_be_modify = video_info['should_be_modify']
         if not should_be_modify:
             return
-        else:
-            result = run_command(input_path, output_path, video_info)
-            if result.returncode == 0:
-                save_file_logs(source_video_info, video_info, output_path)
-                if args.overwrite:
-                    if delete_file(input_path) and rename_file_remove_prefix(output_path, "compressed_"):
-                        # 不知道应不应该将重命名的换成指定两个文件名的方式，而不是删除前缀
-                        process_status[input_path] = "Succeed"
-                else:
+
+        print('start processing :\t' + video_file)
+        result = run_command(input_path, output_path, video_info)
+        out = result.stdout
+        if result.returncode == 0:
+            save_file_logs(source_video_info, video_info, output_path)
+            if args.overwrite:
+                backup_path = output_path.replace("compressed_", "backup_")
+                shutil.copy(input_path, backup_path)
+                if delete_file(input_path) and rename_file_remove_prefix(output_path, "compressed_"):
+                    delete_file(backup_path)  # 成功就删除备份
+                    # 不知道应不应该将重命名的换成指定两个文件名的方式，而不是删除前缀
                     process_status[input_path] = "Succeed"
-
-
+                else:
+                    # 否则将备份源文件还原，确保不损失
+                    rename_file_remove_prefix(backup_path, "backup_")
+                    process_status[input_path] = "Failed"
+                result_path = output_path.replace("compressed_", "")
             else:
-                process_status[input_path] = "Failed"
+                process_status[input_path] = "Succeed"
+                result_path = output_path
 
+            print('process succeed :\t' + video_file)
+        else:
+            process_status[input_path] = "Failed"
+        if input_path in process_status and process_status[input_path] == "Succeed":
+            k = int(source_video_info['file_size'])
+            size_change[k] = int(get_video_info(result_path)['file_size'] / 1024 / 1024)
+            print("视频原大小：{:.2f}MB，压缩后大小：{:.2f}MB".format(k / 1024 / 1024, size_change[k] / 1024 / 1024))
+        log_file_path = f"{input_folder}/compress.log"
+        with open(log_file_path, 'a') as log_file:
+            # 执行命令并将输出追加写入log文件
+            log_file.write(result.stdout)
     except Exception as e:
-        print('process failed : ' + video_file)
+        print('process failed : \t' + video_file)
         traceback.print_exc()
 
 
@@ -234,6 +254,9 @@ if __name__ == '__main__':
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
             executor.map(process_video, video_files)
         print("压缩完成！")
+        print("压缩前总视频大小：{:.2f}MB，压缩后总视频大小：{:.2f}MB"
+              .format(sum(size_change.keys()) / 1024 / 1024, sum(size_change.values()) / 1024 / 1024))
+
         for key, value in process_status.items():
             print(value, ":\t", key)
     except Exception as e:
@@ -245,6 +268,7 @@ if __name__ == '__main__':
 
 # todo: 已压缩文件不再重复处理：目前压缩后的画面效果尚未验证，因此是在文件名加一个前缀compressed来区分。
 #  而后续应当是直接覆盖的，所以考虑：要么附带留一个log文件，要么在视频的元信息里写入一个标记
+# ——finished
 
 # todo: 目前存在个问题，设置了bufsize之后，会导致压缩出的文件比直接只设置h265而不加其他任何参数就压缩的结果，反而要大几mb。
 #  如果是设置缓冲区增强了画面变化激烈时刻的清晰度，那这是理想的行为；但是如果没有增益反而压缩率低了，那就是bug了，需要考虑还要不要设置这个
@@ -304,3 +328,4 @@ if __name__ == '__main__':
 #     ]
 # }
 # ```
+# ——finished
