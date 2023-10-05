@@ -13,3 +13,4 @@ sqlite=3.41.2
 vc=14.2
 vs2015_runtime=14.27.29016
 wheel=0.38.4
+loguru~=0.5.2

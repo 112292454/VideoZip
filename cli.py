@@ -37,7 +37,7 @@ def process_video(video_file):
 
         tags: dict = json.loads(read_mp4_tag(input_path, COMPRESSED_FLAG))
         if tags.get("has_compressed"):
-            print(f'已处理过的文件，跳过:\t{input_path}')
+            logger.info(f'已处理过的文件，跳过:\t{input_path}')
             return
 
         # 获取视频信息，可以使用 ffprobe 来获取
@@ -49,9 +49,8 @@ def process_video(video_file):
         if not should_be_modify:
             return
 
-        print('start processing :\t' + video_file)
+        logger.info('start processing :\t' + input_path)
         result = run_command(input_path, output_path, video_info)
-        out = result.stdout
         if result.returncode == 0:
             save_file_logs(source_video_info, video_info, output_path)
             if args.overwrite:
@@ -67,20 +66,18 @@ def process_video(video_file):
                     process_status[input_path] = "Failed"
                 result_path = output_path.replace("compressed_", "")
             else:
+                save_file_logs(source_video_info, video_info, input_path)
                 process_status[input_path] = "Succeed"
                 result_path = output_path
 
-            print('process succeed :\t' + video_file)
+            logger.info('process succeed :\t' + video_file)
         else:
             process_status[input_path] = "Failed"
         if input_path in process_status and process_status[input_path] == "Succeed":
             k = int(source_video_info['file_size'])
-            size_change[k] = int(get_video_info(result_path)['file_size'] / 1024 / 1024)
-            print("视频原大小：{:.2f}MB，压缩后大小：{:.2f}MB".format(k / 1024 / 1024, size_change[k] / 1024 / 1024))
-        log_file_path = f"{input_folder}/compress.log"
-        with open(log_file_path, 'a') as log_file:
-            # 执行命令并将输出追加写入log文件
-            log_file.write(result.stdout)
+            size_change[k] = int(get_video_info(result_path)['file_size'])
+            logger.info("视频原大小：{:.2f}MB，压缩后大小：{:.2f}MB".format(k / 1024 / 1024, size_change[k] / 1024 / 1024))
+
     except Exception as e:
         print('process failed : \t' + video_file)
         traceback.print_exc()
@@ -106,7 +103,7 @@ def run_command(input_path, output_path, video_info):
         '-crf', str(args.crf),  # 264默认23，265默认28。越低越清晰，越大.每差6，体积翻倍
         '-maxrate', str(video_info['video_bit_rate']),  # 视频比特率
         '-bufsize', str(video_info['video_bit_rate'] * 8),
-        '-vf', f'scale={width}:{height}',  # 调整分辨率
+        '-vf', f'scale={width}:{height}:force_original_aspect_ratio=decrease',  # 调整分辨率
         '-r', str(video_info['frame_rate']),  # 输出帧率
         '-c:a', 'aac',  # 音频编码器为 AAC
         '-b:a', str(video_info['audio_bit_rate']),  # 音频比特率
@@ -120,7 +117,8 @@ def run_command(input_path, output_path, video_info):
     ]
     # 举例：调整分辨率为 720p，并降低码率
     # 执行压缩命令
-    return subprocess.run(compress_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    with open(input_folder+"/ffmpeg.log",'a')as ffmpeg_logs:
+        return subprocess.run(compress_command, stdout=ffmpeg_logs, stderr=ffmpeg_logs, text=True)
 
 
 def predict_video_info(video_info):
@@ -156,44 +154,15 @@ def predict_video_info(video_info):
         video_info['should_be_modify'] = False
         return video_info
 
-    # 分辨率调整。8k、4k均降一档；2k待定要不要变1080p；720p以下的均提升到720p
-    shape = {
-        '8k': (7680, 4320),
-        '4k': (3840, 2160),
-        '2k': (2560, 1440),
-        "1080p": (1920, 1080),
-        "720p": (1280, 720)
-    }
-
-    def size_judge(w, h, v1, v2):
-        return (v1 * 0.99 < w < v1 * 1.01 and v2 * 0.99 < h < v2 * 1.01) or (
-                v1 * 0.99 < h < v1 * 1.01 and v2 * 0.99 < w < v2 * 1.01)
-
-    def adjust_trans(a, b, v1, v2):
-        if a > b:
-            return v1, v2
-        else:
-            return v2, v1
-
-    video_size: str = '1080p'
-    if size_judge(width, height, *shape['8k']):  # 8K
-        (video_info['width'], video_info['height']) = adjust_trans(width, height, *shape['4k'])
-        video_size = '4k'
-    elif size_judge(width, height, *shape['4k']):
-        (video_info['width'], video_info['height']) = adjust_trans(width, height, *shape['2k'])
-        video_size = '2k'
-    # elif size_judge(width,height,*shape['2k']):
-    #     (video_info['width'],video_info['height'])=adjust_trans(width,height,*shape['1080p'])
-    #     video_size='1080p'
-    elif width < 720 or height < 720:
-        (video_info['width'], video_info['height']) = adjust_trans(width, height, *shape['720p'])
-        video_size = '720p'
+    video_info, video_size = getShape(video_info)
 
     # 帧率，归入到[30,60]
-    if frame_rate > 60:
+    if frame_rate > 120:
+        video_info['frame_rate'] = 120
+    elif frame_rate > 60:
         video_info['frame_rate'] = 60
-    elif frame_rate < 30:
-        video_info['frame_rate'] = 30
+    # elif frame_rate < 30:
+    #     video_info['frame_rate'] = 30
 
     # 比特率
     br = {
@@ -231,6 +200,44 @@ def predict_video_info(video_info):
     return video_info
 
 
+def getShape(video_info):
+    width = video_info['width']  # 视频帧宽度
+    height = video_info['height']  # 视频帧高度
+    # 分辨率调整。8k、4k均降一档；2k待定要不要变1080p；720p以下的均提升到720p
+    shape = {
+        '8k': (7680, 4320),
+        '4k': (3840, 2160),
+        '2k': (2560, 1440),
+        "1080p": (1920, 1080),
+        "720p": (1280, 720)
+    }
+
+    def size_judge(w, h, v1, v2):
+        return (v1 * 0.99 < w < v1 * 1.01 and v2 * 0.99 < h < v2 * 1.01) or (
+                v1 * 0.99 < h < v1 * 1.01 and v2 * 0.99 < w < v2 * 1.01)
+
+    def adjust_trans(a, b, v1, v2):
+        if a >= b:
+            return v1, v2
+        else:
+            return v2, v1
+
+    video_size: str = '1080p'
+    if size_judge(width, height, *shape['8k']):  # 8K
+        (video_info['width'], video_info['height']) = adjust_trans(width, height, *shape['4k'])
+        video_size = '4k'
+    elif size_judge(width, height, *shape['4k']):
+        (video_info['width'], video_info['height']) = adjust_trans(width, height, *shape['2k'])
+        video_size = '2k'
+    # elif size_judge(width,height,*shape['2k']):
+    #     (video_info['width'],video_info['height'])=adjust_trans(width,height,*shape['1080p'])
+    #     video_size='1080p'
+    elif width < 720 or height < 720:
+        (video_info['width'], video_info['height']) = adjust_trans(width, height, *shape['720p'])
+        video_size = '720p'
+    return video_info, video_size
+
+
 init()
 
 if __name__ == '__main__':
@@ -240,25 +247,33 @@ if __name__ == '__main__':
         num_threads = args.thread_num
         types = args.types.split(",")
         input_folder = args.dir
+        video_files = walk_files(input_folder)
+
+        if os.path.isfile(input_folder):
+            input_folder=os.path.dirname(input_folder)
+        logger.add(f"{input_folder}/compress.log")
+
+        logger.debug('this is a debug')
 
         # 创建输出文件夹
         # if not os.path.exists(output_folder):
         #     os.makedirs(output_folder)
 
         # 获取输入文件夹中的所有视频文件
-        video_files = walk_files(input_folder)
         video_files = filter_files_by_types(video_files, types)
-        for file_path in video_files:
-            print(file_path)
+        logger.info("所有视频文件列表如下：")
+        logger.info("\n" + ('\n'.join([file_path for file_path in video_files])))
+
         # 使用线程池并发处理视频压缩任务
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
             executor.map(process_video, video_files)
-        print("压缩完成！")
-        print("压缩前总视频大小：{:.2f}MB，压缩后总视频大小：{:.2f}MB"
-              .format(sum(size_change.keys()) / 1024 / 1024, sum(size_change.values()) / 1024 / 1024))
+        logger.info("压缩完成！")
+        logger.info("压缩前总视频大小：{:.2f}MB，压缩后总视频大小：{:.2f}MB"
+                    .format(sum(size_change.keys()) / 1024 / 1024, sum(size_change.values()) / 1024 / 1024))
 
-        for key, value in process_status.items():
-            print(value, ":\t", key)
+        logger.info("所有视频最终处理状态如下：")
+        logger.info('\n'.join([f"{value}:\t{key}" for key, value in process_status.items()]))
+
     except Exception as e:
         traceback.print_exc()
 

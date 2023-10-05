@@ -7,6 +7,8 @@ import subprocess
 import sys
 from mutagen.mp4 import MP4, MP4Cover, MP4FreeForm
 
+from loguru import logger
+
 COMPRESSED_FLAG = "COMP" # 标识是否已经压缩过的tag key
 # !!注意，tag只支持4字母识别  我看mutagen官网说有自由tag，但是没成功
 # https://mutagen.readthedocs.io/en/latest/api/mp4.html#module-mutagen.mp4
@@ -66,15 +68,15 @@ def get_os_program_name(name):
                 # 处理形如 /e/tool/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe
                 exe_location = exe_location[1:]
                 exe_location = exe_location.replace("/", ":/", 1)
-            print(f"{name} 的位置: {exe_location}")
+            logger.debug(f"{name} 的位置: {exe_location}")
             name = exe_location
         except subprocess.CalledProcessError:
-            print(f"找不到 {name}")
+            logger.warning(f"找不到 {name}")
     elif sys.platform.startswith('linux'):
         name = name
     else:
         name = name
-        print("warn: unknown os")
+        logger.warning("warn: unknown os")
     return name
 
 def get_video_info(video_path):
@@ -92,6 +94,8 @@ def get_video_info(video_path):
     video_stream = info_dict['streams'][0]
     audio_stream = info_dict['streams'][1]if len(info_dict['streams'])>1 else {}
 
+    if 'width' in audio_stream:
+        audio_stream,video_stream=(video_stream,audio_stream)
     # frame_rate = eval(video_stream['r_frame_rate'])  # 视频帧率
     # video_bit_rate = int(video_stream['bit_rate'])  # 视频码率
     # width = int(video_stream['width'])  # 视频帧宽度
@@ -108,7 +112,7 @@ def get_video_info(video_path):
     frame_rate = float(video_stream.get('frame_rate', 30.0))  # 视频帧率，默认值为30.0
     video_bit_rate = int(video_stream.get('video_bit_rate', 2521927))  # 视频码率，默认值为2521927
     width = int(video_stream.get('width', 1080))  # 视频帧宽度，默认值为1080
-    height = int(video_stream.get('height', 1920))  # 视频帧高度，默认值为1920
+    height = int(video_stream.get('height', 720))  # 视频帧高度，默认值为1920
     duration = float(video_stream.get('duration', 61))  # 视频时长，默认值为61
     video_codec_name = video_stream.get('video_codec_name', 'h264')  # 视频编码方式，默认值为'h264'
 
