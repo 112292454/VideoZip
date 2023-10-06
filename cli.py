@@ -35,13 +35,13 @@ def process_video(video_file):
         output_path = os.path.join(video_path, f"compressed_{base_name}.mp4")
         result_path = ""
 
+        # 获取视频信息，可以使用 ffprobe 来获取
+        source_video_info = get_video_info(input_path)  # 调用获取视频信息函数
         tags: dict = json.loads(read_mp4_tag(input_path, COMPRESSED_FLAG))
         if tags.get("has_compressed"):
             logger.info(f'已处理过的文件，跳过:\t{input_path}')
             return
 
-        # 获取视频信息，可以使用 ffprobe 来获取
-        source_video_info = get_video_info(input_path)  # 调用获取视频信息函数
         # todo:压缩率、处理变化、log
         video_info = predict_video_info(source_video_info.copy())
 
@@ -117,7 +117,7 @@ def run_command(input_path, output_path, video_info):
     ]
     # 举例：调整分辨率为 720p，并降低码率
     # 执行压缩命令
-    with open(input_folder+"/ffmpeg.log",'a')as ffmpeg_logs:
+    with open(input_folder + "/ffmpeg.log", 'a') as ffmpeg_logs:
         return subprocess.run(compress_command, stdout=ffmpeg_logs, stderr=ffmpeg_logs, text=True)
 
 
@@ -250,7 +250,7 @@ if __name__ == '__main__':
         video_files = walk_files(input_folder)
 
         if os.path.isfile(input_folder):
-            input_folder=os.path.dirname(input_folder)
+            input_folder = os.path.dirname(input_folder)
         logger.add(f"{input_folder}/compress.log")
 
         logger.debug('this is a debug')
@@ -277,21 +277,12 @@ if __name__ == '__main__':
     except Exception as e:
         traceback.print_exc()
 
-# todo: windows适配：subprocess.run在win上需要写ffmpeg（或ffprobe）那个exe的全路径，不然报错，而linux直接ffmpeg就可以了。
-#  所以需要whereis ffmpeg自动获取到这个exe然后填进去
-# ——finished
-
-# todo: 已压缩文件不再重复处理：目前压缩后的画面效果尚未验证，因此是在文件名加一个前缀compressed来区分。
-#  而后续应当是直接覆盖的，所以考虑：要么附带留一个log文件，要么在视频的元信息里写入一个标记
-# ——finished
-
 # todo: 目前存在个问题，设置了bufsize之后，会导致压缩出的文件比直接只设置h265而不加其他任何参数就压缩的结果，反而要大几mb。
 #  如果是设置缓冲区增强了画面变化激烈时刻的清晰度，那这是理想的行为；但是如果没有增益反而压缩率低了，那就是bug了，需要考虑还要不要设置这个
 
+# todo: 实现--clear清理
 
-# fix： 部分年代较早的视频转h265之后无法播放，原因未知，文件见附；h264可以播放，但压缩效果毕竟不好，并且会糊；vp9速度不到h265的一半，太慢了
-# 已提问题： https://stackoverflow.com/questions/77030749/when-using-ffmpeg-encode-to-hevc-but-got-rawvideo
-# ——疑似finish，设置成MP4就好了
+# todo: 输入路径支持|分隔的多个目录
 
 # fix： webm格式视频好像ffprobe获取信息不全，目前的写法会缺字段无法转换，可以考虑缺省。比如以下就会缺字段
 # ```
