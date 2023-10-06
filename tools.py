@@ -28,6 +28,8 @@ def get_args():
                         help='crf level; no loss in {h264-19,h265-22,av1-22}, default in {h264-23,h265-28,av1-30}')
     parser.add_argument('-O', '--overwrite', action='store_true',
                         help='overwrite compressed file on source file, default is not, and named it as "compressed_xx"')
+    parser.add_argument('-F', '--force', action='store_true',
+                        help='process video , no matter it has processed')
     parser.add_argument('-C', '--clear', action='store_true',
                         help='clear middle files. if with -O, will replace source file with compressed_file. (not '
                              'implement)')

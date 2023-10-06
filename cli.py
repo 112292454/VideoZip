@@ -37,13 +37,14 @@ def process_video(video_file):
 
         # 获取视频信息，可以使用 ffprobe 来获取
         source_video_info = get_video_info(input_path)  # 调用获取视频信息函数
-        tags: dict = json.loads(read_mp4_tag(input_path, COMPRESSED_FLAG))
-        if tags.get("has_compressed"):
-            logger.info(f'已处理过的文件，跳过:\t{input_path}')
-            return
-
         # todo:压缩率、处理变化、log
         video_info = predict_video_info(source_video_info.copy())
+
+
+        tags: dict = json.loads(read_mp4_tag(input_path, COMPRESSED_FLAG))
+        if tags.get("has_compressed") and not args.force:
+            logger.info(f'已处理过的文件，跳过:\t{input_path}')
+            return
 
         should_be_modify = video_info['should_be_modify']
         if not should_be_modify:
@@ -140,7 +141,7 @@ def predict_video_info(video_info):
     file_name: str = video_info['file_name']
     file_p: str = video_info['file_path']
 
-    if file_name.startswith("compressed_"):
+    if file_name.startswith("compressed_") and not args.force:
         video_info['should_be_modify'] = False
         return
 
