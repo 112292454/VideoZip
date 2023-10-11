@@ -1,16 +1,17 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
 # platform: win-64
-ca-certificates=2023.05.30
-hachoir=3.2.0
-libffi=3.4.4
-mutagen=1.47.0
-openssl=3.0.10
-pip=23.2.1
-python=3.8.17
-setuptools=68.0.0
-sqlite=3.41.2
-vc=14.2
-vs2015_runtime=14.27.29016
-wheel=0.38.4
-loguru~=0.5.2
+loguru==0.5.2
+hachoir==3.2.0
+mutagen==1.47.0
+vc==14.2
+vs2015_runtime==14.27.29016
+ca-certificates==2023.05.30
+libffi==3.4.4
+openssl==3.0.10
+pip==23.2.1
+python==3.8.17
+setuptools==68.0.0
+sqlite==3.41.2
+wheel==0.38.4
+

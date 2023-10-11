@@ -1,1 +1,1 @@
-python3 test.py -d . -thread 2
+nohup python cli.py -d /data/share/鸡图包//PR社@押尾猫合集 -thread 1  >>押尾猫.log &

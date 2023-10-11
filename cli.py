@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from tools import *
 
 input_folder = ""
+error_logs = ""
 # output_folder = ""
 num_threads = 1  # 设置线程数
 
@@ -40,7 +41,6 @@ def process_video(video_file):
         # todo:压缩率、处理变化、log
         video_info = predict_video_info(source_video_info.copy())
 
-
         tags: dict = json.loads(read_mp4_tag(input_path, COMPRESSED_FLAG))
         if tags.get("has_compressed") and not args.force:
             logger.info(f'已处理过的文件，跳过:\t{input_path}')
@@ -64,7 +64,9 @@ def process_video(video_file):
                 else:
                     # 否则将备份源文件还原，确保不损失
                     rename_file_remove_prefix(backup_path, "backup_")
+                    logger.warning('process failed :\t' + video_file)
                     process_status[input_path] = "Failed"
+                    log_err_file(error_logs, input_path)
                 result_path = output_path.replace("compressed_", "")
             else:
                 save_file_logs(source_video_info, video_info, input_path)
@@ -73,14 +75,18 @@ def process_video(video_file):
 
             logger.info('process succeed :\t' + video_file)
         else:
+            logger.warning('process failed :\t' + video_file)
+            logger.warning('return code as :\t' + str(result.returncode))
             process_status[input_path] = "Failed"
+            log_err_file(error_logs, input_path)
+
         if input_path in process_status and process_status[input_path] == "Succeed":
             k = int(source_video_info['file_size'])
             size_change[k] = int(get_video_info(result_path)['file_size'])
             logger.info("视频原大小：{:.2f}MB，压缩后大小：{:.2f}MB".format(k / 1024 / 1024, size_change[k] / 1024 / 1024))
 
     except Exception as e:
-        print('process failed : \t' + video_file)
+        print('program failed : \t' + video_file)
         traceback.print_exc()
 
 
@@ -98,26 +104,29 @@ def run_command(input_path, output_path, video_info):
     # 根据你的需求，可以调整视频的分辨率、帧率、码率等参数
     compress_command = [
         ffmpeg,  # FFmpeg 命令
-        '-i', input_path,  # 输入文件路径
-        '-c:v', video_info['video_codec_name'],  # 视频编码器
+        "-loglevel", "info", "-loglevel", "info", "-loglevel", "info", "-loglevel", "info", "-loglevel", "info",
         # '-preset', 'fast',
-        '-crf', str(args.crf),  # 264默认23，265默认28。越低越清晰，越大.每差6，体积翻倍
+        '-i', input_path,  # 输入文件路径
         '-maxrate', str(video_info['video_bit_rate']),  # 视频比特率
         '-bufsize', str(video_info['video_bit_rate'] * 8),
-        '-vf', f'scale={width}:{height}:force_original_aspect_ratio=decrease',  # 调整分辨率
+        '-c:v', video_info['video_codec_name'],  # 视频编码器
+        '-crf', str(args.crf),  # 264默认23，265默认28。越低越清晰，越大.每差6，体积翻倍
+        '-vf', f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2',  # 调整分辨率
         '-r', str(video_info['frame_rate']),  # 输出帧率
         '-c:a', 'aac',  # 音频编码器为 AAC
         '-b:a', str(video_info['audio_bit_rate']),  # 音频比特率
         '-ar', str(video_info['audio_sample_rate']),  # 音频采样率
         '-y',
         output_path  # 输出文件路径
-        # input_path
-        # !!warn：此处直接覆盖源文件！使用之前最好做有备份，如果发现哪里有问题立刻停止。我目前测试了30g的视频没啥问题
-        # 如果保险一点可以使用上面注释掉的的output path，不直接使用input path来覆盖源文件
-        # 哦没事了，ffmpeg不允许覆盖源文件，只能py代码里手动删原本的，
+
     ]
+
     # 举例：调整分辨率为 720p，并降低码率
     # 执行压缩命令
+    logger.debug(f"run ffmpeg command as: \n{' '.join(compress_command)}")
+    # with open('ffmpeg_logs', 'w') as f:
+    #     process = subprocess.run(compress_command, stdout=f, stderr=f, text=True)
+    # return process
     with open(input_folder + "/ffmpeg.log", 'a') as ffmpeg_logs:
         return subprocess.run(compress_command, stdout=ffmpeg_logs, stderr=ffmpeg_logs, text=True)
 
@@ -256,14 +265,15 @@ if __name__ == '__main__':
 
         logger.debug('this is a debug')
 
-        # 创建输出文件夹
-        # if not os.path.exists(output_folder):
-        #     os.makedirs(output_folder)
+        error_logs = f"{input_folder}/failed_files.log"
 
         # 获取输入文件夹中的所有视频文件
         video_files = filter_files_by_types(video_files, types)
-        logger.info("所有视频文件列表如下：")
-        logger.info("\n" + ('\n'.join([file_path for file_path in video_files])))
+
+        if args.list_files:
+            logger.info("所有视频文件列表如下：")
+            logger.info("\n" + ('\n'.join([file_path for file_path in video_files])))
+            logger.info(f"文件总大小为{sum(os.path.getsize(v) for v in video_files) / 1024 / 1024 // 1.0}MB")
 
         # 使用线程池并发处理视频压缩任务
         with ThreadPoolExecutor(max_workers=num_threads) as executor:

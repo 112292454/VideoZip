@@ -9,11 +9,11 @@ from mutagen.mp4 import MP4, MP4Cover, MP4FreeForm
 
 from loguru import logger
 
-COMPRESSED_FLAG = "COMP" # 标识是否已经压缩过的tag key
+COMPRESSED_FLAG = "COMP"  # 标识是否已经压缩过的tag key
 # !!注意，tag只支持4字母识别  我看mutagen官网说有自由tag，但是没成功
 # https://mutagen.readthedocs.io/en/latest/api/mp4.html#module-mutagen.mp4
 
-ffprobe="ffprobe"
+ffprobe = "ffprobe"
 
 
 def get_args():
@@ -26,6 +26,9 @@ def get_args():
                         help='thread num, default is 2')
     parser.add_argument('-crf', '--crf', type=int, default='28',
                         help='crf level; no loss in {h264-19,h265-22,av1-22}, default in {h264-23,h265-28,av1-30}')
+    parser.add_argument('-cpucount', '--cpu_count', type=int, default='-1',
+                        help='one thread use how many cores,default is not limit')
+
     parser.add_argument('-O', '--overwrite', action='store_true',
                         help='overwrite compressed file on source file, default is not, and named it as "compressed_xx"')
     parser.add_argument('-F', '--force', action='store_true',
@@ -33,8 +36,16 @@ def get_args():
     parser.add_argument('-C', '--clear', action='store_true',
                         help='clear middle files. if with -O, will replace source file with compressed_file. (not '
                              'implement)')
+    parser.add_argument('-L', '--list_files', action='store_true',
+                        help='list all files before process or not, default is false')
     args = parser.parse_args()
     return args
+
+
+def log_err_file(err_logs, err_file):
+    with open(err_logs, 'a') as out:
+        out.write(err_file + "\n")
+
 
 # 获取文件夹内所有非目录文件
 def walk_files(root_dir):
@@ -47,7 +58,6 @@ def walk_files(root_dir):
                 file_path = os.path.join(root, file)
                 if os.path.isfile(file_path):
                     file_list.append(file_path)
-
     return file_list
 
 
@@ -83,23 +93,23 @@ def get_os_program_name(name):
         logger.warning("warn: unknown os")
     return name
 
+
 def get_video_info(video_path):
     # pprint.pp(video_path)
     ffprobe_cmd = [ffprobe, '-v', 'error', '-show_entries',
-                       'stream=duration,r_frame_rate,bit_rate,width,height,codec_name:stream=codec_name,bit_rate:stream=sample_rate',
-                       '-of', 'json', video_path]
+                   'stream=duration,r_frame_rate,bit_rate,width,height,codec_name:stream=codec_name,bit_rate:stream=sample_rate',
+                   '-of', 'json', video_path]
     result = subprocess.run(ffprobe_cmd, capture_output=True, text=True)
     info_json = result.stdout
     # pprint.pp(info_json)
 
     info_dict = json.loads(info_json)  # 使用json.loads来解析JSON字符串成字典
 
-
     video_stream = info_dict['streams'][0]
-    audio_stream = info_dict['streams'][1]if len(info_dict['streams'])>1 else {}
+    audio_stream = info_dict['streams'][1] if len(info_dict['streams']) > 1 else {}
 
     if 'width' in audio_stream:
-        audio_stream,video_stream=(video_stream,audio_stream)
+        audio_stream, video_stream = (video_stream, audio_stream)
     # frame_rate = eval(video_stream['r_frame_rate'])  # 视频帧率
     # video_bit_rate = int(video_stream['bit_rate'])  # 视频码率
     # width = int(video_stream['width'])  # 视频帧宽度
@@ -156,6 +166,7 @@ def delete_file(file_path):
     else:
         return False
 
+
 def rename_file_remove_prefix(file_path, prefix):
     """重命名文件并去除文件名中的指定前缀"""
     if os.path.exists(file_path):
@@ -174,6 +185,7 @@ def rename_file_remove_prefix(file_path, prefix):
     else:
         return False
 
+
 def write_mp4_tag(file_path, tag_name, tag_value):
     try:
         mp4_file = MP4(file_path)
@@ -183,6 +195,7 @@ def write_mp4_tag(file_path, tag_name, tag_value):
     except Exception as e:
         # print(f"{file_path}写入标签时出错：{e}")
         return
+
 
 def read_mp4_tag(file_path, tag_name):
     try:
@@ -203,6 +216,11 @@ def read_mp4_tag(file_path, tag_name):
 
 def init():
     global ffprobe
-    ffprobe=get_os_program_name(ffprobe)
+    ffprobe = get_os_program_name(ffprobe)
+
 
 init()
+
+# log_err_file("./err.log", "abc")
+# log_err_file("./err.log", "asaasfasdasd恰为asdadsd手打阿斯达第三方")
+# log_err_file("./err.log", ffprobe)
