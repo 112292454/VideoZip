@@ -4,7 +4,7 @@
 ## 依赖
 - ffmpeg
 - ffprobe
-- requirements.txt的conda环境（这个主要是判断mp4文件的原信息所需要的）
+- requirements.txt的conda环境（这个主要是判断mp4文件的元信息所需要的——对于被此程序压缩过的视频，将会在mp4头里写入一个标签，避免重复压缩）
 
 ## 使用
 `python cli.py -d your_folder`
