@@ -1,15 +1,15 @@
 # VideoZip
  视频压缩脚本
 
-## 依赖
+## Requirements
 - ffmpeg
 - ffprobe
 - requirements.txt的conda环境（这个主要是判断mp4文件的元信息所需要的——对于被此程序压缩过的视频，将会在mp4头里写入一个标签，避免重复压缩）
 
-## 使用
+## Usage
 `python cli.py -d your_folder`
 
-### 更多参数
+### More Args
 
 -   -h, --help            show this help message and exit                                                         
 -   -d DIR, --dir DIR     to processed video dir         ——待处理的文件夹路径，也可以是单个文件名                                                         
